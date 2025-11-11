@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Time Will Tell — Main</title>
+<style>
+  body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden;
+    background: #f9f9f9;
+    font-family: "Inter", sans-serif;
+    height: 100vh;
+  }
+
+  .circle {
+    position: absolute;
+    width: 70px;
+    height: 70px;
+    border-radius: 50%;
+    background: white;
+    border: 1.5px solid #111;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #111;
+    font-weight: 600;
+    text-decoration: none;
+    font-size: 20px;
+    transition: transform 0.3s, background 0.3s, color 0.3s;
+  }
+
+  .circle:hover {
+    background: #111;
+    color: white;
+    transform: scale(1.2);
+  }
+</style>
+</head>
+<body>
+
+  <a href="./page1.html" class="circle" id="circle1">1</a>
+  <a href="./page2.html" class="circle" id="circle2">2</a>
+  <a href="./page3.html" class="circle" id="circle3">3</a>
+
+<script>
+  const circles = document.querySelectorAll('.circle');
+
+  // 각 원의 초기 랜덤 위치
+  circles.forEach(circle => {
+    circle.style.top = Math.random() * (window.innerHeight - 70) + 'px';
+    circle.style.left = Math.random() * (window.innerWidth - 70) + 'px';
+  });
+
+  // 부드럽게 떠다니는 모션
+  circles.forEach(circle => {
+    let x = parseFloat(circle.style.left);
+    let y = parseFloat(circle.style.top);
+    let dx = (Math.random() - 0.5) * 1.5; // 속도
+    let dy = (Math.random() - 0.5) * 1.5;
+
+    function move() {
+      x += dx;
+      y += dy;
+
+      // 벽에 부딪히면 반사
+      if (x <= 0 || x >= window.innerWidth - 70) dx *= -1;
+      if (y <= 0 || y >= window.innerHeight - 70) dy *= -1;
+
+      circle.style.left = x + 'px';
+      circle.style.top = y + 'px';
+
+      requestAnimationFrame(move);
+    }
+    move();
+  });
+</script>
+
+</body>
+</html>
