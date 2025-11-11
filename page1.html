@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>옷입히기</title>
+<style>
+  :root{ --hairColor:#222; }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0f0f10;color:#eee;font-family:system-ui,Apple SD Gothic Neo,Inter,sans-serif;min-height:100dvh;display:grid;grid-template-rows:auto 1fr auto}
+  header,footer{padding:14px 16px;border-bottom:1px solid #222}
+  footer{border-top:1px solid #222;border-bottom:none;display:flex;gap:10px;justify-content:space-between;align-items:center}
+  header h1{margin:0;font-size:18px;color:#cfcfcf}
+  .wrap{display:grid;grid-template-columns:1.2fr .8fr;gap:18px;padding:16px;max-width:1100px;margin:0 auto;width:100%}
+  /* Stage (레이어 겹치기) */
+  .stage{position:relative;aspect-ratio:3/4;background:#141416;border:1px solid #222;border-radius:16px;display:grid;place-items:center;overflow:hidden}
+  .canvas{position:relative;width:min(90%,560px);height:auto;aspect-ratio:3/4}
+  .layer{position:absolute;inset:0;background-position:center;background-repeat:no-repeat;background-size:contain;pointer-events:none}
+  /* 머리 마스크(색 입히기) */
+  .hair-mask{background:var(--hairColor);-webkit-mask-position:center;-webkit-mask-repeat:no-repeat;-webkit-mask-size:contain;mask-position:center;mask-repeat:no-repeat;mask-size:contain}
+  /* 컨트롤 */
+  .panel{border:1px solid #222;border-radius:16px;padding:12px;background:#141416}
+  .row{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:10px;margin:8px 0}
+  .row label{font-size:14px;color:#bdbdbd}
+  .control{display:flex;gap:8px;align-items:center}
+  button.nav{width:36px;height:36px;border-radius:10px;border:1px solid #2a2a2a;background:#1b1b1d;color:#eee;font-weight:700;cursor:pointer}
+  button.nav:active{transform:translateY(1px)}
+  .index{font-size:12px;color:#aaa;min-width:42px;text-align:center}
+  .swatches{display:grid;grid-template-columns:repeat(8,24px);gap:8px;margin:8px 0}
+  .swatches button{width:24px;height:24px;border-radius:50%;border:1px solid #333;cursor:pointer}
+  textarea,input{width:100%;padding:10px;border-radius:10px;border:1px solid #2a2a2a;background:#121214;color:#eee}
+  .go{padding:12px 16px;border-radius:12px;background:#eef56a;color:#111;font-weight:800;border:0;cursor:pointer}
+  .hint{font-size:12px;color:#8f8f8f}
+</style>
+</head>
+<body>
+  <header><h1>옷입히기</h1></header>
+
+  <main class="wrap">
+    <!-- 미리보기 Stage -->
+    <section class="stage">
+      <div class="canvas" id="canvas">
+        <!-- 레이어 순서: 뒷머리 → 신체 → 하의 → 신발 → 상의 → 앞머리 -->
+        <div class="layer hair-mask" id="backHair"></div>
+        <div class="layer" id="body"></div>
+        <div class="layer" id="bottom"></div>
+        <div class="layer" id="shoes"></div>
+        <div class="layer" id="top"></div>
+        <div class="layer hair-mask" id="frontHair"></div>
+      </div>
+    </section>
+
+    <!-- 컨트롤 패널 -->
+    <aside class="panel">
+      <div class="row">
+        <label>앞머리</label>
+        <div class="control">
+          <button class="nav" data-cat="frontHair" data-delta="-1">◀</button>
+          <span class="index" id="i-frontHair">1</span>
+          <button class="nav" data-cat="frontHair" data-delta="1">▶</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>뒷머리</label>
+        <div class="control">
+          <button class="nav" data-cat="backHair" data-delta="-1">◀</button>
+          <span class="index" id="i-backHair">1</span>
+          <button class="nav" data-cat="backHair" data-delta="1">▶</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>상의</label>
+        <div class="control">
+          <button class="nav" data-cat="top" data-delta="-1">◀</button>
+          <span class="index" id="i-top">1</span>
+          <button class="nav" data-cat="top" data-delta="1">▶</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>하의</label>
+        <div class="control">
+          <button class="nav" data-cat="bottom" data-delta="-1">◀</button>
+          <span class="index" id="i-bottom">1</span>
+          <button class="nav" data-cat="bottom" data-delta="1">▶</button>
+        </div>
+      </div>
+      <div class="row">
+        <label>신발</label>
+        <div class="control">
+          <button class="nav" data-cat="shoes" data-delta="-1">◀</button>
+          <span class="index" id="i-shoes">1</span>
+          <button class="nav" data-cat="shoes" data-delta="1">▶</button>
+        </div>
+      </div>
+
+      <hr style="border-color:#222;margin:12px 0">
+
+      <div>
+        <label style="display:block;margin:6px 0 2px">머리색</label>
+        <div class="swatches" id="swatches"></div>
+        <div class="hint">PNG든 SVG든 적용돼요(마스크 방식).</div>
+      </div>
+
+      <div style="margin-top:10px">
+        <label style="display:block;margin:6px 0 6px">짧은 한마디</label>
+        <input id="message" maxlength="40" placeholder="최대 40자" />
+      </div>
+    </aside>
+  </main>
+
+  <footer>
+    <span class="hint">Tip: 자산 개수를 늘리면 배열에 경로만 추가하세요.</span>
+    <div style="display:flex;gap:8px">
+      <a class="go" href="index.html" style="background:#2a2a2a;color:#ddd">← 안내</a>
+      <button class="go" id="saveGo">완성하고 떨어뜨리기 →</button>
+    </div>
+  </footer>
+
+<script>
+/* =============== ① 자산 경로만 바꿔 쓰세요 =============== */
+/* 파일명/폴더명은 예시입니다. JSBin이라면 외부에 업로드한 이미지 URL을 넣어도 됩니다. */
+const ASSET_BODY   = 'assets/body/body_base.png'; // 사람 형체 1장
+const ASSET_FRONT  = [
+  'assets/hair_front/front_01.png',
+  'assets/hair_front/front_02.png',
+  'assets/hair_front/front_03.png',
+  'assets/hair_front/front_04.png',
+];
+const ASSET_BACK   = [
+  'assets/hair_back/back_01.png',
+  'assets/hair_back/back_02.png',
+  'assets/hair_back/back_03.png',
+  'assets/hair_back/back_04.png',
+];
+const ASSET_TOP    = [
+  'assets/top/top_01.png','assets/top/top_02.png','assets/top/top_03.png','assets/top/top_04.png',
+];
+const ASSET_BOTTOM = [
+  'assets/bottom/bottom_01.png','assets/bottom/bottom_02.png','assets/bottom/bottom_03.png','assets/bottom/bottom_04.png',
+];
+const ASSET_SHOES  = [
+  'assets/shoes/shoes_01.png','assets/shoes/shoes_02.png','assets/shoes/shoes_03.png','assets/shoes/shoes_04.png',
+];
+/* 더 늘리고 싶으면 배열에 경로를 계속 추가하면 됩니다. */
+
+/* 머리색 팔레트 */
+const HAIR_COLORS = ['#111','#2f2f2f','#6b4d3e','#a0522d','#d48a3a','#f2c14e','#b37bd6','#5ab0ff','#69e0c3','#ff6b9a','#ff3b3b','#ffffff'];
+
+/* =============== ② 상태 =============== */
+const state = {
+  frontHair: 0,
+  backHair: 0,
+  top: 0,
+  bottom: 0,
+  shoes: 0,
+  hairColor: HAIR_COLORS[0],
+  message: ''
+};
+
+/* =============== ③ 엘리먼트 캐시 =============== */
+const el = {
+  body: document.getElementById('body'),
+  frontHair: document.getElementById('frontHair'),
+  backHair: document.getElementById('backHair'),
+  top: document.getElementById('top'),
+  bottom: document.getElementById('bottom'),
+  shoes: document.getElementById('shoes'),
+  index: {
+    frontHair: document.getElementById('i-frontHair'),
+    backHair: document.getElementById('i-backHair'),
+    top: document.getElementById('i-top'),
+    bottom: document.getElementById('i-bottom'),
+    shoes: document.getElementById('i-shoes'),
+  },
+  message: document.getElementById('message'),
+  swatches: document.getElementById('swatches'),
+  saveGo: document.getElementById('saveGo'),
+};
+
+/* =============== ④ 초기 렌더 =============== */
+function setLayerBg(div, url){
+  if(!url){ div.style.backgroundImage = 'none'; return; }
+  div.style.backgroundImage = `url('${url}')`;
+}
+
+/* 마스크 레이어에 소스 설정 (hair) */
+function setHairMask(div, url){
+  div.style.webkitMaskImage = `url('${url}')`;
+  div.style.maskImage = `url('${url}')`;
+}
+
+/* 인덱스 라벨 */
+function setIndex(cat, idx, total){
+  el.index[cat].textContent = `${idx+1}/${total}`;
+}
+
+function renderAll(){
+  setLayerBg(el.body, ASSET_BODY);
+  setLayerBg(el.top, ASSET_TOP[state.top]);
+  setLayerBg(el.bottom, ASSET_BOTTOM[state.bottom]);
+  setLayerBg(el.shoes, ASSET_SHOES[state.shoes]);
+  setHairMask(el.frontHair, ASSET_FRONT[state.frontHair]);
+  setHairMask(el.backHair, ASSET_BACK[state.backHair]);
+  setIndex('frontHair', state.frontHair, ASSET_FRONT.length);
+  setIndex('backHair', state.backHair, ASSET_BACK.length);
+  setIndex('top', state.top, ASSET_TOP.length);
+  setIndex('bottom', state.bottom, ASSET_BOTTOM.length);
+  setIndex('shoes', state.shoes, ASSET_SHOES.length);
+  document.documentElement.style.setProperty('--hairColor', state.hairColor);
+}
+renderAll();
+
+/* =============== ⑤ 네비게이션 =============== */
+document.querySelectorAll('button.nav').forEach(btn=>{
+  btn.addEventListener('click', ()=>{
+    const cat = btn.dataset.cat;
+    const delta = +btn.dataset.delta;
+    const map = {
+      frontHair: ASSET_FRONT.length,
+      backHair: ASSET_BACK.length,
+      top: ASSET_TOP.length,
+      bottom: ASSET_BOTTOM.length,
+      shoes: ASSET_SHOES.length
+    };
+    const len = map[cat];
+    state[cat] = (state[cat] + delta + len) % len;
+    renderAll();
+  });
+});
+
+/* =============== ⑥ 머리색 팔레트 =============== */
+HAIR_COLORS.forEach(hex=>{
+  const b = document.createElement('button');
+  b.style.background = hex;
+  b.title = hex;
+  b.addEventListener('click', ()=>{
+    state.hairColor = hex;
+    document.documentElement.style.setProperty('--hairColor', state.hairColor);
+  });
+  el.swatches.appendChild(b);
+});
+
+/* =============== ⑦ 한마디 입력 =============== */
+el.message.addEventListener('input', e=> state.message = e.target.value.trim());
+
+/* =============== ⑧ 저장 + 이동 =============== */
+el.saveGo.addEventListener('click', ()=>{
+  const payload = {
+    indices: {
+      frontHair: state.frontHair,
+      backHair: state.backHair,
+      top: state.top,
+      bottom: state.bottom,
+      shoes: state.shoes
+    },
+    hairColor: state.hairColor,
+    message: state.message,
+    assets: {
+      body: ASSET_BODY,
+      front: ASSET_FRONT,
+      back: ASSET_BACK,
+      top: ASSET_TOP,
+      bottom: ASSET_BOTTOM,
+      shoes: ASSET_SHOES
+    }
+  };
+  localStorage.setItem('myCharacter', JSON.stringify(payload));
+  location.href = 'gallery.html';
+});
+</script>
+</body>
+</html>
