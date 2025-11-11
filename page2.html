@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>떨어지는 장면</title>
+<style>
+  :root{ --hairColor:#222; }
+  *{box-sizing:border-box}
+  body{margin:0;background:#0b0b0c;color:#eee;font-family:system-ui,Apple SD Gothic Neo,Inter,sans-serif;min-height:100dvh;display:grid;place-items:center;overflow:hidden}
+  .stage{position:relative;width:min(92vw,780px);aspect-ratio:3/4;background:linear-gradient(#101012,#0c0c0d);border:1px solid #1e1e1f;border-radius:18px;overflow:hidden}
+  .layer{position:absolute;inset:auto auto;left:50%;transform:translate(-50%,-140%);width:86%;aspect-ratio:3/4;background-position:center;background-repeat:no-repeat;background-size:contain;pointer-events:none;animation:fall 2.4s cubic-bezier(.2,.7,.2,1) forwards;animation-delay:.25s;filter:drop-shadow(0 8px 14px rgba(0,0,0,.45))}
+  .hair-mask{background:var(--hairColor);-webkit-mask-position:center;-webkit-mask-repeat:no-repeat;-webkit-mask-size:contain;mask-position:center;mask-repeat:no-repeat;mask-size:contain}
+  .row{position:absolute;inset:0}
+  @keyframes fall{
+    0%{ transform:translate(-50%,-140%) rotate(0deg) }
+    60%{ transform:translate(-50%, 54vh) rotate(2.5deg) }
+    76%{ transform:translate(-50%, 49vh) rotate(-1deg) }
+    100%{transform:translate(-50%, 52vh) rotate(0deg)}
+  }
+  /* 텍스트 가루 캔버스 */
+  canvas{position:absolute;inset:0;pointer-events:none}
+  .nav{position:absolute;bottom:14px;right:14px;background:#eef56a;color:#111;font-weight:800;padding:10px 14px;border-radius:12px;text-decoration:none}
+</style>
+</head>
+<body>
+  <div class="stage" id="stage">
+    <!-- 파티클 캔버스 -->
+    <canvas id="dust"></canvas>
+
+    <!-- 레이어들 (순서: 뒷머리→신체→하의→신발→상의→앞머리) -->
+    <div class="row">
+      <div class="layer hair-mask" id="backHair"></div>
+      <div class="layer" id="body"></div>
+      <div class="layer" id="bottom"></div>
+      <div class="layer" id="shoes"></div>
+      <div class="layer" id="top"></div>
+      <div class="layer hair-mask" id="frontHair"></div>
+    </div>
+    <a class="nav" href="builder.html">다시 만들기</a>
+  </div>
+
+<script>
+const payload = JSON.parse(localStorage.getItem('myCharacter')||'null');
+if(!payload){
+  location.href = 'builder.html';
+}
+
+/* 머리색 반영 */
+document.documentElement.style.setProperty('--hairColor', payload.hairColor);
+
+/* 레이어 채우기 */
+const L = {
+  backHair: document.getElementById('backHair'),
+  body: document.getElementById('body'),
+  bottom: document.getElementById('bottom'),
+  shoes: document.getElementById('shoes'),
+  top: document.getElementById('top'),
+  frontHair: document.getElementById('frontHair')
+};
+
+function setBg(div,url){ div.style.backgroundImage = `url('${url}')`; }
+function setMask(div,url){
+  div.style.webkitMaskImage = `url('${url}')`;
+  div.style.maskImage = `url('${url}')`;
+}
+
+setMask(L.backHair, payload.assets.back[payload.indices.backHair]);
+setMask(L.frontHair, payload.assets.front[payload.indices.frontHair]);
+setBg(L.body, payload.assets.body);
+setBg(L.top, payload.assets.top[payload.indices.top]);
+setBg(L.bottom, payload.assets.bottom[payload.indices.bottom]);
+setBg(L.shoes, payload.assets.shoes[payload.indices.shoes]);
+
+/* 텍스트 → 가루 파티클 */
+const canvas = document.getElementById('dust');
+const ctx = canvas.getContext('2d');
+const DPR = Math.min(2, window.devicePixelRatio||1);
+
+function resize(){
+  const rect = document.getElementById('stage').getBoundingClientRect();
+  canvas.width = Math.floor(rect.width * DPR);
+  canvas.height = Math.floor(rect.height * DPR);
+  canvas.style.width = rect.width + 'px';
+  canvas.style.height = rect.height + 'px';
+}
+resize();
+addEventListener('resize', resize);
+
+/* 파티클 생성 */
+const msg = (payload.message||'').trim();
+let particles = [];
+
+function makeDustFromText(text){
+  particles = [];
+  if(!text) return;
+
+  // 1) 오프스크린에 텍스트 렌더
+  const off = document.createElement('canvas');
+  const ow = Math.floor(canvas.width * 0.8);
+  const oh = Math.floor(canvas.height * 0.22);
+  off.width = ow; off.height = oh;
+  const ox = off.getContext('2d');
+  ox.clearRect(0,0,ow,oh);
+  ox.fillStyle = '#ffffff';
+  ox.textAlign = 'center';
+  // 크기 자동: 한 줄 문구 기준
+  const fontPx = Math.max(18, Math.min(64, Math.floor(ow / (text.length*0.6))));
+  ox.font = `bold ${fontPx}px system-ui,Apple SD Gothic Neo,Inter,sans-serif`;
+  ox.fillText(text, ow/2, Math.floor(oh*0.65));
+
+  // 2) 픽셀 샘플링 → 파티클
+  const img = ox.getImageData(0,0,ow,oh).data;
+  const gap = Math.max(3, Math.floor(fontPx/6)); // 샘플 간격(가루 밀도)
+  const startX = (canvas.width - ow)/2;
+  const startY = Math.floor(canvas.height * 0.08); // 상단에서 조금 아래
+  for(let y=0;y<oh;y+=gap){
+    for(let x=0;x<ow;x+=gap){
+      const i = (y*ow + x)*4 + 3; // alpha
+      if(img[i] > 100){ // 불투명 픽셀만
+        particles.push({
+          x: startX + x + (Math.random()-0.5)*2,
+          y: startY + y + (Math.random()-0.5)*2,
+          vx: (Math.random()-0.5)*0.6,
+          vy: -Math.random()*1.2, // 초기 살짝 위로 튀기
+          life: 1,                // 투명도 제어용
+          size: Math.max(1, Math.floor(gap/2)),
+        });
+      }
+    }
+  }
+}
+makeDustFromText(msg);
+
+/* 애니메이션 (중력, 공기저항) */
+let t0 = null;
+function tick(ts){
+  if(!t0) t0 = ts;
+  const dt = Math.min(33, ts - t0); t0 = ts;
+  const g = 0.12 * (canvas.height/800); // 중력 스케일
+  const drag = 0.992;
+
+  ctx.clearRect(0,0,canvas.width, canvas.height);
+  for(const p of particles){
+    p.vy += g;
+    p.vx *= drag; p.vy *= drag;
+    p.x += p.vx * (dt/16);
+    p.y += p.vy * (dt/16);
+    p.life *= 0.995; // 점점 사라짐
+
+    // 바닥에 닿으면 흩날리다 멈춤
+    const ground = canvas.height*0.88;
+    if(p.y > ground){
+      p.y = ground;
+      p.vx *= 0.7; p.vy *= -0.25;
+      if(Math.abs(p.vy) < 0.12) { p.vy = 0; }
+      p.life *= 0.98;
+    }
+
+    if(p.life > 0.02){
+      ctx.globalAlpha = Math.max(0, p.life);
+      ctx.fillStyle = '#eaeaea';
+      ctx.fillRect(p.x, p.y, p.size, p.size);
+      ctx.globalAlpha = 1;
+    }
+  }
+  requestAnimationFrame(tick);
+}
+requestAnimationFrame(tick);
+</script>
+</body>
+</html>
