@@ -1,8 +1,3 @@
-<!DOCTYPE html>
-<html lang="ko">
-<head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width,initial-scale=1" />
 <title>옷입히기</title>
 <style>
   :root{ --hairColor:#222; }
@@ -119,7 +114,7 @@
 <script>
 /* =============== ① 자산 경로만 바꿔 쓰세요 =============== */
 /* 파일명/폴더명은 예시입니다. JSBin이라면 외부에 업로드한 이미지 URL을 넣어도 됩니다. */
-const ASSET_BODY   = 'assets/body/body_base.png'; // 사람 형체 1장
+const ASSET_BODY = 'https://cdn.jsdelivr.net/gh/your-id/character-assets@main/assets/body/body_base.png';
 const ASSET_FRONT  = [
   'assets/hair_front/front_01.png',
   'assets/hair_front/front_02.png',
@@ -266,6 +261,11 @@ el.saveGo.addEventListener('click', ()=>{
   };
   localStorage.setItem('myCharacter', JSON.stringify(payload));
   location.href = 'gallery.html';
+});
+</script>
+</body>
+</html>
+
 });
 </script>
 </body>
